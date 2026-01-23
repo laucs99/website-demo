@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>記帳 Pro (結算優化版)</title>
+    <style>
+        :root {
+            --bg-color: #f2f2f7;
+            --card-bg: #ffffff;
+            --primary: #007aff;
+            --travel-color: #5856d6;
+            --daily-color: #007aff;
+            --cny-color: #ff9500;
+            --jpy-color: #af52de;
+            --thb-color: #00a400;
+            --vnd-color: #d32f2f;
+            --danger: #ff3b30;
+            --text-main: #000000;
+            --text-sub: #8e8e93;
+            --border-radius: 16px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "San Francisco", "Helvetica Neue", sans-serif;
+            background-color: var(--bg-color);
+            margin: 0; padding: 0; padding-bottom: 220px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 頂部控制區 */
+        .top-controls {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
+            padding: 30px 15px 10px 15px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            display: flex; flex-direction: column; gap: 5px;
+        }
+
+        .date-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 0; }
+        
+        .day-title-input {
+            font-size: 24px; font-weight: 800; border: none; background: transparent;
+            width: 100%; outline: none; color: #000;
+            padding: 5px 0;
+        }
+        .day-title-input::placeholder { color: #ccc; font-weight: 600; }
+        .day-title-input:focus { border-bottom: 2px solid var(--primary); }
+
+        /* 標題標籤列 */
+        .title-labels-scroll {
+            display: flex; overflow-x: auto; gap: 8px; padding-bottom: 8px; -webkit-overflow-scrolling: touch; margin-top: 5px;
+        }
+        .title-labels-scroll::-webkit-scrollbar { display: none; }
+
+        .title-label-chip {
+            padding: 5px 12px; background: #f0f0f5; border-radius: 14px;
+            font-size: 12px; font-weight: 600; color: #555; white-space: nowrap; border: 1px solid transparent;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .title-label-chip:active { background: #e5e5ea; transform: scale(0.95); }
+        .title-label-chip::before { content: "📍"; font-size: 10px; }
+
+        .top-row { display: flex; gap: 8px; align-items: center; margin-top: 5px; margin-bottom: 5px;}
+
+        .mode-switcher { flex: 2; display: flex; gap: 5px; }
+        .mode-btn {
+            flex: 1; padding: 8px; border-radius: 10px; text-align: center;
+            font-weight: 700; font-size: 13px; color: var(--text-sub);
+            background: #e5e5ea; transition: all 0.2s; border: 2px solid transparent;
+        }
+        .mode-btn.active-daily { background: #eef6ff; color: var(--daily-color); border-color: var(--daily-color); }
+        .mode-btn.active-travel { background: #f5f0ff; color: var(--travel-color); border-color: var(--travel-color); }
+
+        /* Req 2: 結算單按鈕優化 */
+        .receipt-btn {
+            padding: 0 15px; height: 36px; border-radius: 10px; background: #333; color: white;
+            font-size: 14px; font-weight: 700; border: none; display: flex; align-items: center; justify-content: center; gap: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .icon-btn {
+            width: 36px; height: 36px; border-radius: 10px; background: #e5e5ea; color: #333;
+            font-size: 16px; font-weight: 700; border: none; display: flex; align-items: center; justify-content: center;
+        }
+
+        /* View Controls */
+        .view-controls {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #f2f2f7; padding: 5px; border-radius: 10px; margin-top: 0;
+        }
+        .date-picker-wrapper { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 600; }
+        .view-toggle-btn {
+            background: white; border: 1px solid #ccc; padding: 5px 12px; border-radius: 8px;
+            font-size: 14px; font-weight: bold; color: #333; display: flex; align-items: center; gap: 5px;
+        }
+        .view-toggle-btn.active { background: #333; color: white; border-color: #333; }
+        .checkbox-label { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #555; font-weight: 600;}
+
+        /* Card & Input */
+        .card {
+            background: var(--card-bg); margin: 15px; padding: 15px;
+            border-radius: var(--border-radius); box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+        }
+        .rate-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; background: #f9f9f9; padding: 8px; border-radius: 10px;}
+        .rate-item { display: flex; align-items: center; font-size: 12px; color: var(--text-sub); }
+        .rate-input { border: 1px solid #ddd; background: white; padding: 4px; border-radius: 6px; width: 50px; text-align: center; font-weight: bold; margin-left: 5px; }
+
+        input[type="text"], input[type="number"], input[type="date"] {
+            width: 100%; padding: 12px 0; font-size: 18px; border: none;
+            border-bottom: 1px solid #e5e5ea; outline: none; background: transparent; border-radius: 0;
+            margin-bottom: 10px;
+        }
+
+        .tags-wrapper { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 8px; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
+        .tags-wrapper::-webkit-scrollbar { display: none; }
+        .tag-chip {
+            padding: 8px 16px; background: white; border: 1px solid #d1d1d6; border-radius: 20px;
+            font-size: 14px; font-weight: 600; color: var(--text-sub); white-space: nowrap; transition: all 0.2s;
+        }
+        .tag-chip.selected {
+            background: var(--primary); color: white; border-color: var(--primary);
+            box-shadow: 0 2px 6px rgba(0,122,255,0.3);
+        }
+
+        .filters-container { margin: 0 15px 15px 15px; }
+        .horizontal-scroll-bar { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 5px; -webkit-overflow-scrolling: touch; }
+        .horizontal-scroll-bar::-webkit-scrollbar { display: none; }
+        .filter-label { font-size: 12px; color: #8e8e93; margin-bottom: 5px; margin-left: 5px; font-weight:600; margin-top: 15px; }
+        .filter-label:first-child { margin-top: 0; }
+        .filter-chip {
+            padding: 6px 14px; background: #e5e5ea; border-radius: 16px; font-size: 12px;
+            font-weight: 600; color: #555; white-space: nowrap; border: 1px solid transparent;
+        }
+        .filter-chip.active { background: #333; color: white; }
+        
+        .amount-row { display: flex; gap: 15px; align-items: flex-end; margin-bottom: 10px; min-height: 55px; }
+        .sup-input-group { display: none; width: 80px; }
+        .sup-input-group label { font-size: 10px; color: var(--danger); font-weight: bold; display: block; margin-bottom: -5px; }
+        .sup-input-group input { color: var(--danger); border-bottom: 1px solid var(--danger); font-weight: bold; margin-bottom: 0; }
+
+        .mood-selector { display: flex; gap: 15px; justify-content: center; margin-bottom: 15px; background: #f9f9f9; padding: 8px; border-radius: 12px;}
+        .mood-btn { font-size: 24px; opacity: 0.4; transition: transform 0.2s; cursor: pointer; filter: grayscale(100%); }
+        .mood-btn.active { opacity: 1; transform: scale(1.3); filter: grayscale(0%); }
+
+        .member-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .select-all-btn { font-size: 11px; color: var(--primary); background: #eef6ff; padding: 3px 8px; border-radius: 10px; border:none; font-weight: 600;}
+
+        .member-chips-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+        .member-select-chip { padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; border: 1px solid #e5e5ea; color: var(--text-sub); background: white; }
+        .member-select-chip.active { background: #eef6ff; color: var(--primary); border-color: var(--primary); }
+
+        .row-group { display: flex; gap: 8px; margin-bottom: 10px; }
+        .btn-select { flex: 1; padding: 10px; text-align: center; background: #f0f0f5; border-radius: 8px; font-weight: 600; font-size: 13px; color: #8e8e93; }
+        .btn-select.active { background: #333; color: white; }
+        
+        .currency-option.active-hkd { background: var(--daily-color); color: white; }
+        .currency-option.active-cny { background: var(--cny-color); color: white; }
+        .currency-option.active-jpy { background: var(--jpy-color); color: white; }
+        .currency-option.active-thb { background: var(--thb-color); color: white; }
+        .currency-option.active-vnd { background: var(--vnd-color); color: white; }
+
+        .main-btn { width: 100%; padding: 14px; border-radius: 12px; font-size: 17px; font-weight: 700; border: none; color: white; margin-top: 5px; }
+        .btn-daily { background: var(--daily-color); }
+        .btn-travel { background: var(--travel-color); }
+
+        .section-title { margin: 20px 20px 5px 20px; font-size: 12px; color: var(--text-sub); font-weight: 700; }
+        .list-group { background: white; border-radius: 16px; overflow: hidden; margin: 0 15px; }
+        .expense-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: white; border-bottom: 1px solid #f0f0f5; }
+        
+        .item-info { flex: 1; display: flex; flex-direction: column; }
+        .item-title-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+        .item-title { font-size: 16px; font-weight: 500; }
+        .item-mood { font-size: 14px; }
+        .sup-badge { color: var(--danger); font-size: 12px; font-weight: bold; }
+        .item-meta { font-size: 11px; color: var(--text-sub); margin-top: 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;}
+        .tag-badge { background: #f2f2f7; padding: 2px 6px; border-radius: 4px; }
+        .member-badge { color: #007aff; background: #eef6ff; padding: 2px 6px; border-radius: 4px; }
+
+        .item-price-box { text-align: right; margin-right: 10px;}
+        .main-price { font-size: 16px; font-weight: 600; }
+        .sub-price { font-size: 11px; color: #8e8e93; }
+        .price-hkd { color: var(--daily-color); }
+        .price-cny { color: var(--cny-color); }
+        .price-jpy { color: var(--jpy-color); }
+        .price-thb { color: var(--thb-color); }
+        .price-vnd { color: var(--vnd-color); }
+
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; padding: 15px; }
+        .expense-card-item { background: white; border-radius: 16px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .card-tag { font-size: 10px; background: #f2f2f7; padding: 3px 6px; border-radius: 4px; color: #666; }
+        .card-date { font-size: 10px; color: #aaa; margin-top: 2px; }
+        .card-main { margin-bottom: 10px; }
+        .card-footer { display: flex; justify-content: space-between; align-items: flex-end; }
+        .card-period-icon { position: absolute; top: 10px; right: 10px; font-size: 14px; opacity: 0.5; }
+        .count-display { font-size: 16px; font-weight: 800; color: var(--primary); }
+        .count-label { font-size: 12px; color: #8e8e93; font-weight: 600; }
+
+        .link-icon { text-decoration: none; font-size: 14px; padding: 3px 6px; border-radius: 6px; background: #f2f2f7; margin-left: 2px; transition: background 0.2s; }
+        .link-icon:active { background: #e5e5ea; }
+        .link-icon.map::after { content: ""; }
+        .link-icon.book::after { content: ""; }
+
+        .btn-delete-mini { font-size: 16px; color: #ccc; border:none; background:none;}
+        .currency-switch-btn { background: white; border: 1px solid #d1d1d6; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; color: var(--text-main); box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 3px; }
+
+        .total-bar { position: fixed; bottom: 25px; left: 15px; right: 15px; background: rgba(20, 20, 20, 0.95); backdrop-filter: blur(20px); color: white; padding: 12px 20px; border-radius: 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 200; }
+        .total-select { background: transparent; color: #aaa; border: none; font-size: 12px; font-weight: bold; }
+        .grand-total { font-size: 20px; font-weight: 700; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: flex-end; z-index: 500; }
+        .modal-overlay.show { display: flex; }
+        .modal-content { background: white; width: 100%; border-radius: 20px 20px 0 0; padding: 25px; padding-bottom: 50px; animation: slideUp 0.3s ease; max-height: 85vh; overflow-y: auto; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        /* Req 1: 成員管理列表樣式 (Checkbox) */
+        .member-list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f5; }
+        .member-left { display: flex; align-items: center; gap: 10px; }
+        .member-checkbox {
+            width: 20px; height: 20px; border: 2px solid #ccc; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: transparent;
+        }
+        .member-checkbox.checked { border-color: var(--primary); background: var(--primary); color: white; }
+        .member-name { font-size: 16px; font-weight: 500; }
+        .member-delete { color: var(--danger); font-size: 14px; font-weight: 600; padding: 5px; }
+
+        /* Req 3: 結算單成員標籤 */
+        .receipt-members { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+        .receipt-member-tag { font-size: 10px; padding: 1px 4px; border-radius: 4px; color: #ccc; border: 1px solid transparent; }
+        .receipt-member-tag.involved { color: #333; border-color: #333; font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+<div class="top-controls" id="topControls">
+    <div class="date-title-row">
+        <input type="text" id="dayTitleInput" class="day-title-input" placeholder="今日主題" onblur="saveDayTitle()">
+    </div>
+    <div class="title-labels-scroll" id="titleLabelBar"></div>
+
+    <div class="top-row">
+        <div class="mode-switcher">
+            <div class="mode-btn active-daily" id="modeDaily" onclick="switchMode('daily')">🏠 內地遊</div>
+            <div class="mode-btn" id="modeTravel" onclick="switchMode('travel')">✈️ 旅行</div>
+        </div>
+        <!-- Req 2: 結算單按鈕優化 -->
+        <button class="receipt-btn" onclick="showExport()">🧾 結算</button>
+        <button class="icon-btn" onclick="openMemberModal()">👥</button>
+    </div>
+    
+    <div class="view-controls">
+        <div class="date-picker-wrapper">
+            <span>📅</span>
+            <input type="date" id="filterDate" onchange="syncDateChange(this.value)" style="border:none; background:transparent; font-size:14px; width:110px; padding:0; margin:0;">
+        </div>
+        <label class="checkbox-label">
+            <input type="checkbox" id="showAllDates" onchange="toggleShowAllDates()"> 顯示所有日期
+        </label>
+        <button class="view-toggle-btn" id="viewToggleBtn" onclick="toggleViewMode()">
+            ☰ 列表
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="rate-row" id="rateContainer"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span style="font-size:13px; color:#8e8e93; font-weight:bold;">記帳日期:</span>
+        <input type="date" id="inputDate" onchange="syncDateChange(this.value)" style="width:130px; font-size:14px; padding:5px; margin:0; text-align:right;">
+    </div>
+
+    <div class="tags-wrapper" id="tagList"></div>
+    
+    <div class="row-group">
+        <div class="btn-select active" id="p-morning" onclick="setPeriod('morning')">早</div>
+        <div class="btn-select" id="p-noon" onclick="setPeriod('noon')">午</div>
+        <div class="btn-select" id="p-night" onclick="setPeriod('night')">晚</div>
+    </div>
+    
+    <input type="text" id="inputTitle" list="titleSuggestions" placeholder="項目 (例如: 的士)">
+    <datalist id="titleSuggestions"></datalist>
+    
+    <div class="amount-row">
+        <input type="number" id="inputAmount" placeholder="金額" inputmode="decimal" style="flex:1; margin-bottom:0;">
+        <div class="sup-input-group" id="supInputGroup">
+            <label>+ 補費</label>
+            <input type="number" id="inputSupplement" placeholder="0" inputmode="decimal">
+        </div>
+    </div>
+
+    <div class="mood-selector">
+        <div class="mood-btn" id="mood-sad" onclick="setMood('sad')">😭</div>
+        <div class="mood-btn active" id="mood-normal" onclick="setMood('normal')">😐</div>
+        <div class="mood-btn" id="mood-happy" onclick="setMood('happy')">😄</div>
+    </div>
+
+    <div class="member-header">
+        <div style="font-size:12px; color:#8e8e93;">分擔成員:</div>
+        <button class="select-all-btn" onclick="toggleAllMembers('input')">全選 / 清空</button>
+    </div>
+    <div class="member-chips-container" id="inputMemberSelector"></div>
+
+    <div class="row-group" id="currencyGroup"></div>
+    <button id="mainBtn" class="main-btn btn-daily" onclick="addExpense()">記一筆</button>
+</div>
+
+<div class="filters-container">
+    <div class="filter-label">分類篩選 (Tags):</div>
+    <div class="horizontal-scroll-bar" id="tagFilterBar"></div>
+    <div class="filter-label">地點/主題篩選 (Location):</div>
+    <div class="horizontal-scroll-bar" id="titleFilterBar"></div>
+</div>
+
+<div id="listContainer"></div>
+
+<div class="total-bar">
+    <div class="total-left">
+        <select id="totalCurrencySelect" class="total-select" onchange="renderList()"></select>
+    </div>
+    <div class="total-right">
+        <div class="grand-total" id="grandTotal">0.00</div>
+    </div>
+</div>
+
+<!-- Req 1: 成員管理 (含預設勾選框) -->
+<div class="modal-overlay" id="memberModal" onclick="closeMemberModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h3>👥 成員管理</h3>
+        <p style="font-size:12px; color:#888; margin-bottom:15px;">打勾 = 預設參與 (新記帳時自動選取)</p>
+        <div style="display:flex; gap:10px; margin-bottom:20px;">
+            <input type="text" id="newMemberName" placeholder="名字" style="margin:0;">
+            <button onclick="addMember()" style="padding:0 20px; background:var(--primary); color:white; border:none; border-radius:10px;">加入</button>
+        </div>
+        <div id="memberList" style="margin-bottom:20px;"></div>
+        <button class="main-btn" onclick="closeMemberModal(event)" style="background:black;">完成</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="editModal" onclick="closeEdit(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h3>修改項目</h3>
+        <div style="margin-bottom:10px;">
+            <span style="font-size:12px; color:#888;">日期:</span>
+            <input type="date" id="editDate" style="font-size:16px; padding:5px;">
+        </div>
+        <input type="text" id="editTitle" list="titleSuggestions" style="font-weight:bold; font-size:20px; margin-bottom:10px;">
+        <div class="amount-row">
+            <input type="number" id="editAmount" style="font-size:24px; color:var(--primary); flex:1;">
+            <div class="sup-input-group" id="editSupGroup" style="display:block;">
+                <label>補費</label>
+                <input type="number" id="editSupplement" style="font-size:20px;">
+            </div>
+        </div>
+        <div class="mood-selector" id="editMoodSelector">
+            <div class="mood-btn" id="edit-mood-sad" onclick="setEditMood('sad')">😭</div>
+            <div class="mood-btn" id="edit-mood-normal" onclick="setEditMood('normal')">😐</div>
+            <div class="mood-btn" id="edit-mood-happy" onclick="setEditMood('happy')">😄</div>
+        </div>
+        <div class="member-header">
+            <div style="font-size:12px; color:#888;">分擔成員:</div>
+            <button class="select-all-btn" onclick="toggleAllMembers('edit')">全選 / 清空</button>
+        </div>
+        <div class="member-chips-container" id="editMemberSelector"></div>
+        <button class="main-btn" onclick="saveEdit()" style="background:black; margin-top:10px;">儲存</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="exportModal" onclick="closeExport(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div id="receiptContent" style="font-family:monospace; color:#333;"></div>
+        <button class="main-btn" onclick="closeExport(event)" style="background:#e5e5ea; color:black; margin-top:20px;">關閉</button>
+    </div>
+</div>
+
+<script>
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    let defaultTitleLabels = { daily: ['深圳', '廣州', '珠海', '中山'], travel: ['日本', '東京', '大阪', '京都', '泰國', '曼谷'] };
+    let rawTitleLabels = JSON.parse(localStorage.getItem('titleLabels'));
+    if (!rawTitleLabels || Array.isArray(rawTitleLabels)) rawTitleLabels = defaultTitleLabels;
+
+    let appState = {
+        mode: localStorage.getItem('mode') || 'daily',
+        expenses: JSON.parse(localStorage.getItem('expenses_v17')) || [],
+        tags: JSON.parse(localStorage.getItem('tags')) || ['正餐', '交通', '飲料', '購物', '甜品', '按摩', '超市', '酒店'],
+        members: JSON.parse(localStorage.getItem('members')) || ['我'],
+        // Req 1: Default Selected Members
+        defaultMembers: JSON.parse(localStorage.getItem('defaultMembers')) || ['我'], 
+        books: JSON.parse(localStorage.getItem('books')) || [{id: 'default', name: '預設旅程'}],
+        currentBookId: localStorage.getItem('currentBookId') || 'default',
+        dayTitles: JSON.parse(localStorage.getItem('dayTitles')) || {},
+        titleLabels: rawTitleLabels,
+        rates: {
+            HKD_RMB: parseFloat(localStorage.getItem('rate_HKD_RMB')) || 0.92,
+            JPY_HKD: parseFloat(localStorage.getItem('rate_JPY_HKD')) || 0.052,
+            THB_HKD: parseFloat(localStorage.getItem('rate_THB_HKD')) || 0.22,
+            VND_HKD: parseFloat(localStorage.getItem('rate_VND_HKD')) || 0.00031
+        },
+        input: { period: 'noon', tag: '正餐', currency: 'HKD', mood: 'normal', date: todayStr },
+        view: { mode: 'list', showAllDates: false, filterDate: todayStr, filterTag: 'All', filterTitle: 'All' }, 
+        selectedMembers: [],
+        editingId: null,
+        editMoodTemp: 'normal'
+    };
+    
+    // 初始化選擇成員為預設成員
+    appState.selectedMembers = [...appState.defaultMembers];
+
+    if(!appState.books.find(b => b.id === appState.currentBookId)) {
+        appState.currentBookId = appState.books[0].id;
+    }
+
+    const h = new Date().getHours();
+    if(h < 11) appState.input.period = 'morning';
+    else if(h >= 11 && h < 17) appState.input.period = 'noon';
+    else appState.input.period = 'night';
+
+    function init() {
+        document.getElementById('inputDate').value = todayStr;
+        document.getElementById('filterDate').value = todayStr;
+        switchMode(appState.mode);
+        renderTags();
+        renderFilters();
+        renderMemberSelector('input');
+        updateViewModeBtn();
+        updateTitleSuggestions(); 
+        renderTitleLabels(); 
+        loadDayTitle();
+    }
+
+    // --- Req 1: 成員管理 & 預設 ---
+    function openMemberModal() { renderMemberList(); document.getElementById('memberModal').classList.add('show'); }
+    function closeMemberModal(e) { if(e.target.id === 'memberModal' || e.target.tagName === 'BUTTON') document.getElementById('memberModal').classList.remove('show'); }
+    
+    function renderMemberList() {
+        const div = document.getElementById('memberList');
+        div.innerHTML = '';
+        appState.members.forEach((m, idx) => {
+            const isDefault = appState.defaultMembers.includes(m);
+            const row = document.createElement('div');
+            row.className = 'member-list-item';
+            row.innerHTML = `
+                <div class="member-left" onclick="toggleDefaultMember('${m}')">
+                    <div class="member-checkbox ${isDefault ? 'checked' : ''}">✓</div>
+                    <span class="member-name">${m}</span>
+                </div>
+                <span class="member-delete" onclick="deleteMember(${idx})">刪除</span>
+            `;
+            div.appendChild(row);
+        });
+    }
+
+    function toggleDefaultMember(name) {
+        if (appState.defaultMembers.includes(name)) {
+            appState.defaultMembers = appState.defaultMembers.filter(m => m !== name);
+        } else {
+            appState.defaultMembers.push(name);
+        }
+        localStorage.setItem('defaultMembers', JSON.stringify(appState.defaultMembers));
+        renderMemberList();
+        // Update current input selection if it hasn't been manually touched (simple reset)
+        appState.selectedMembers = [...appState.defaultMembers];
+        renderMemberSelector('input');
+    }
+
+    function addMember() {
+        const name = document.getElementById('newMemberName').value.trim();
+        if(name && !appState.members.includes(name)) {
+            appState.members.push(name);
+            localStorage.setItem('members', JSON.stringify(appState.members));
+            document.getElementById('newMemberName').value = '';
+            renderMemberList();
+            renderMemberSelector('input');
+        }
+    }
+    
+    function deleteMember(idx) {
+        if(confirm("確定刪除成員?")) {
+            const name = appState.members[idx];
+            appState.members.splice(idx, 1);
+            appState.defaultMembers = appState.defaultMembers.filter(m => m !== name);
+            localStorage.setItem('members', JSON.stringify(appState.members));
+            localStorage.setItem('defaultMembers', JSON.stringify(appState.defaultMembers));
+            renderMemberList();
+            appState.selectedMembers = [...appState.defaultMembers];
+            renderMemberSelector('input');
+        }
+    }
+
+    // --- Standard Logic ---
+    function renderTitleLabels() {
+        const div = document.getElementById('titleLabelBar'); div.innerHTML = '';
+        const currentLabels = appState.titleLabels[appState.mode] || [];
+        currentLabels.forEach(label => {
+            const chip = document.createElement('div'); chip.className = 'title-label-chip'; chip.innerText = label;
+            chip.onclick = () => setDayTitleFromLabel(label); div.appendChild(chip);
+        });
+        const addBtn = document.createElement('div'); addBtn.className = 'title-label-chip'; addBtn.innerText = '+'; addBtn.style.color = 'var(--primary)';
+        addBtn.onclick = () => { const n = prompt("新增地點標籤:"); if(n) { if (!appState.titleLabels[appState.mode]) appState.titleLabels[appState.mode] = []; if (!appState.titleLabels[appState.mode].includes(n)) { appState.titleLabels[appState.mode].push(n); localStorage.setItem('titleLabels', JSON.stringify(appState.titleLabels)); renderTitleLabels(); } } }; div.appendChild(addBtn);
+    }
+
+    function syncDateChange(newDate) {
+        document.getElementById('inputDate').value = newDate; document.getElementById('filterDate').value = newDate;
+        appState.input.date = newDate; appState.view.filterDate = newDate;
+        document.getElementById('showAllDates').checked = false; appState.view.showAllDates = false;
+        loadDayTitle(); renderList();
+    }
+
+    function loadDayTitle() {
+        const date = document.getElementById('inputDate').value; const key = `${appState.currentBookId}_${date}`; let title = appState.dayTitles[key] || '';
+        if (!title && appState.mode === 'daily') title = '深圳';
+        document.getElementById('dayTitleInput').value = title;
+    }
+    function saveDayTitle() {
+        const date = document.getElementById('inputDate').value; const val = document.getElementById('dayTitleInput').value.trim(); const key = `${appState.currentBookId}_${date}`;
+        if (val) { appState.dayTitles[key] = val; appState.view.filterTitle = val; appState.view.showAllDates = true; document.getElementById('showAllDates').checked = true; } else delete appState.dayTitles[key];
+        localStorage.setItem('dayTitles', JSON.stringify(appState.dayTitles)); renderList(); renderFilters();
+    }
+    function setDayTitleFromLabel(label) { document.getElementById('dayTitleInput').value = label; saveDayTitle(); }
+
+    function renderFilters() {
+        const tagDiv = document.getElementById('tagFilterBar'); tagDiv.innerHTML = '';
+        ['All', ...appState.tags].forEach(opt => {
+            const chip = document.createElement('div'); chip.className = `filter-chip ${opt===appState.view.filterTag?'active':''}`; chip.innerText = opt === 'All' ? '全部分類' : opt;
+            chip.onclick = () => { appState.view.filterTag = opt; renderFilters(); renderList(); }; tagDiv.appendChild(chip);
+        });
+        const currentBookPrefix = `${appState.currentBookId}_`; const usedTitles = new Set();
+        Object.keys(appState.dayTitles).forEach(key => { if (key.startsWith(currentBookPrefix)) usedTitles.add(appState.dayTitles[key]); });
+        const titleDiv = document.getElementById('titleFilterBar'); titleDiv.innerHTML = '';
+        ['All', ...Array.from(usedTitles)].forEach(t => {
+            const chip = document.createElement('div'); chip.className = `filter-chip ${t===appState.view.filterTitle?'active':''}`; chip.innerText = t === 'All' ? '全部地點' : t;
+            chip.onclick = () => { appState.view.filterTitle = t; if (t !== 'All') { appState.view.showAllDates = true; document.getElementById('showAllDates').checked = true; } renderFilters(); renderList(); };
+            titleDiv.appendChild(chip);
+        });
+    }
+
+    function updateTitleSuggestions() {
+        const dl = document.getElementById('titleSuggestions');
+        const relevantExpenses = appState.expenses.filter(e => (e.bookId === appState.currentBookId || !e.bookId) && e.tag === appState.input.tag);
+        const uniqueTitles = [...new Set(relevantExpenses.map(e => e.title))];
+        dl.innerHTML = uniqueTitles.map(t => `<option value="${t}">`).join('');
+    }
+
+    function getExternalLinks(title) {
+        const enc = encodeURIComponent(title);
+        let mapUrl, reviewUrl;
+        if (appState.mode === 'daily') { mapUrl = `https://www.amap.com/search?query=${enc}`; reviewUrl = `https://m.dianping.com/search/keyword/1/0_${enc}`; } else { mapUrl = `https://www.google.com/maps/search/?api=1&query=${enc}`; reviewUrl = `https://www.google.com/search?q=${enc}`; }
+        return `<a href="${mapUrl}" target="_blank" class="link-icon map" onclick="event.stopPropagation()">🗺️</a><a href="${reviewUrl}" target="_blank" class="link-icon book" onclick="event.stopPropagation()">📖</a>`;
+    }
+
+    function switchMode(mode) {
+        appState.mode = mode; localStorage.setItem('mode', mode);
+        document.getElementById('modeDaily').className = `mode-btn ${mode === 'daily'?'active-daily':''}`;
+        document.getElementById('modeTravel').className = `mode-btn ${mode === 'travel'?'active-travel':''}`;
+        const btn = document.getElementById('mainBtn');
+        btn.className = `main-btn ${mode === 'daily'?'btn-daily':'btn-travel'}`;
+        btn.innerText = mode === 'daily' ? '記內地遊 (HKD/RMB)' : '記旅行 (JPY/THB/VND)';
+        renderTitleLabels(); loadDayTitle();
+        const rateDiv = document.getElementById('rateContainer'); const totalSel = document.getElementById('totalCurrencySelect'); const currGrp = document.getElementById('currencyGroup');
+        if(mode === 'daily') {
+            rateDiv.innerHTML = `<div class="rate-item">1 HKD = <input type="number" value="${appState.rates.HKD_RMB}" onchange="updateRate('HKD_RMB', this.value)" class="rate-input"> RMB</div>`;
+            totalSel.innerHTML = `<option value="HKD">顯示: HKD</option><option value="RMB">顯示: RMB</option>`;
+            currGrp.innerHTML = `<div class="btn-select currency-option active-hkd" onclick="setCurrency('HKD',this)">HKD</div><div class="btn-select currency-option" onclick="setCurrency('RMB',this)">RMB</div>`;
+            appState.input.currency = 'HKD';
+        } else {
+            rateDiv.innerHTML = `<div class="rate-item">100 JPY = <input type="number" value="${(appState.rates.JPY_HKD * 100).toFixed(2)}" onchange="updateRate('JPY_HKD_100', this.value)" class="rate-input"> HKD</div><div class="rate-item">1 THB = <input type="number" value="${appState.rates.THB_HKD}" onchange="updateRate('THB_HKD', this.value)" class="rate-input"> HKD</div><div class="rate-item">10k VND = <input type="number" value="${(appState.rates.VND_HKD * 10000).toFixed(2)}" onchange="updateRate('VND_HKD_10000', this.value)" class="rate-input"> HKD</div>`;
+            totalSel.innerHTML = `<option value="HKD">顯示: HKD</option><option value="JPY">顯示: JPY</option><option value="THB">顯示: THB</option><option value="VND">顯示: VND</option>`;
+            currGrp.innerHTML = `<div class="btn-select currency-option active-jpy" onclick="setCurrency('JPY',this)">JPY</div><div class="btn-select currency-option active-thb" onclick="setCurrency('THB',this)">THB</div><div class="btn-select currency-option active-vnd" onclick="setCurrency('VND',this)">VND</div>`;
+            appState.input.currency = 'JPY';
+        }
+        updatePeriodUI(); renderList();
+    }
+    function updateRate(key, val) { if(key === 'JPY_HKD_100') { appState.rates.JPY_HKD = parseFloat(val) / 100; localStorage.setItem('rate_JPY_HKD', appState.rates.JPY_HKD); } else if(key === 'VND_HKD_10000') { appState.rates.VND_HKD = parseFloat(val) / 10000; localStorage.setItem('rate_VND_HKD', appState.rates.VND_HKD); } else if(key === 'THB_HKD') { appState.rates.THB_HKD = parseFloat(val); localStorage.setItem('rate_THB_HKD', appState.rates.THB_HKD); } else { appState.rates[key] = parseFloat(val); localStorage.setItem('rate_HKD_RMB', appState.rates.HKD_RMB); } renderList(); }
+    function setPeriod(p) { appState.input.period = p; updatePeriodUI(); }
+    function updatePeriodUI() { ['morning','noon','night'].forEach(p=>{ document.getElementById(`p-${p}`).className = `btn-select ${p===appState.input.period?'active':''}`; }); }
+    function setCurrency(c, el) { appState.input.currency = c; document.querySelectorAll('.currency-option').forEach(e=>e.classList.remove('active-hkd','active-cny','active-jpy','active-thb','active-vnd')); if(c==='HKD') el.classList.add('active-hkd'); if(c==='RMB') el.classList.add('active-cny'); if(c==='JPY') el.classList.add('active-jpy'); if(c==='THB') el.classList.add('active-thb'); if(c==='VND') el.classList.add('active-vnd'); }
+    function setMood(m) { appState.input.mood = m; ['sad','normal','happy'].forEach(x => { document.getElementById(`mood-${x}`).className = `mood-btn ${x===m?'active':''}`; }); }
+    function setEditMood(m) { appState.editMoodTemp = m; ['sad','normal','happy'].forEach(x => { document.getElementById(`edit-mood-${x}`).className = `mood-btn ${x===m?'active':''}`; }); }
+    function getMoodEmoji(m) { return m==='sad'?'😭':(m==='happy'?'😄':'😐'); }
+    function renderTags() {
+        const div = document.getElementById('tagList'); div.innerHTML = '';
+        appState.tags.forEach(t => { const chip = document.createElement('div'); chip.className = `tag-chip ${t===appState.input.tag?'selected':''}`; chip.innerText = t; chip.onclick = ()=>{ appState.input.tag = t; renderTags(); checkSupInput(); updateTitleSuggestions(); }; div.appendChild(chip); });
+        const add = document.createElement('div'); add.className = 'tag-chip'; add.style.borderColor = 'transparent'; add.style.color = 'var(--primary)'; add.innerText = '+';
+        add.onclick = ()=>{ const n = prompt("新標籤"); if(n) { appState.tags.push(n); localStorage.setItem('tags',JSON.stringify(appState.tags)); appState.input.tag=n; renderTags(); renderFilters(); checkSupInput(); updateTitleSuggestions();} }; div.appendChild(add); checkSupInput(); 
+    }
+    function checkSupInput() { const group = document.getElementById('supInputGroup'); if(appState.input.tag === '交通') group.style.display = 'block'; else { group.style.display = 'none'; document.getElementById('inputSupplement').value = ''; } }
+    function toggleAllMembers(type) {
+        if (type === 'input') { if (appState.selectedMembers.length === appState.members.length) appState.selectedMembers = []; else appState.selectedMembers = [...appState.members]; renderMemberSelector('input'); } 
+        else { const container = document.getElementById('editMemberSelector'); const chips = container.querySelectorAll('.member-select-chip'); const allActive = Array.from(chips).every(c => c.classList.contains('active')); chips.forEach(c => { if (allActive) c.classList.remove('active'); else c.classList.add('active'); }); }
+    }
+    function renderMemberSelector(type, preSelected=null) { const div = document.getElementById(type==='input'?'inputMemberSelector':'editMemberSelector'); div.innerHTML=''; let targets = preSelected || appState.selectedMembers; let pool = [...new Set([...appState.members, ...targets])]; pool.forEach(m => { const chip = document.createElement('div'); const isActive = targets.includes(m); chip.className = `member-select-chip ${isActive?'active':''}`; chip.innerText = m; chip.onclick = () => toggleMemberSelection(m, type, chip); div.appendChild(chip); }); }
+    function toggleMemberSelection(name, type, el) { if(type==='input') { if(appState.selectedMembers.includes(name)) { appState.selectedMembers = appState.selectedMembers.filter(m=>m!==name); el.classList.remove('active'); } else { appState.selectedMembers.push(name); el.classList.add('active'); } } else { if(el.classList.contains('active')) el.classList.remove('active'); else el.classList.add('active'); } }
+
+    function addExpense() {
+        const title = document.getElementById('inputTitle').value; const amt = parseFloat(document.getElementById('inputAmount').value); let sup = parseFloat(document.getElementById('inputSupplement').value); if(isNaN(sup)) sup = 0; const pickedDate = document.getElementById('inputDate').value || todayStr;
+        if(!title || isNaN(amt)) { alert("請輸入完整資料"); return; }
+        if(appState.selectedMembers.length === 0) { alert("請選擇成員"); return; }
+        appState.expenses.push({ id: Date.now(), bookId: appState.currentBookId, mode: appState.mode, period: appState.input.period, tag: appState.input.tag, title: title, amount: amt, supplement: sup, currency: appState.input.currency, date: pickedDate, mood: appState.input.mood, involved: [...appState.selectedMembers] });
+        localStorage.setItem('expenses_v17', JSON.stringify(appState.expenses));
+        renderList(); updateTitleSuggestions();
+        document.getElementById('inputTitle').value=''; document.getElementById('inputAmount').value=''; document.getElementById('inputSupplement').value='';
+        appState.selectedMembers = [...appState.defaultMembers]; renderMemberSelector('input'); setMood('normal');
+    }
+
+    function toggleViewMode() { appState.view.mode = (appState.view.mode === 'list') ? 'card' : 'list'; updateViewModeBtn(); renderList(); }
+    function updateViewModeBtn() { const btn = document.getElementById('viewToggleBtn'); if (appState.view.mode === 'card') { btn.innerHTML = '▣ 卡片'; btn.classList.add('active'); } else { btn.innerHTML = '☰ 列表'; btn.classList.remove('active'); } }
+    function toggleShowAllDates() { appState.view.showAllDates = document.getElementById('showAllDates').checked; renderList(); }
+    function getConvertedValue(amount, fromCurr, toCurr) {
+        let hkdVal = 0; if(fromCurr === 'HKD') hkdVal = amount; else if(fromCurr === 'RMB') hkdVal = amount / appState.rates.HKD_RMB; else if(fromCurr === 'JPY') hkdVal = amount * appState.rates.JPY_HKD; else if(fromCurr === 'THB') hkdVal = amount * appState.rates.THB_HKD; else if(fromCurr === 'VND') hkdVal = amount * appState.rates.VND_HKD;
+        if(toCurr === 'HKD') return hkdVal; if(toCurr === 'RMB') return hkdVal * appState.rates.HKD_RMB; if(toCurr === 'JPY') return hkdVal / appState.rates.JPY_HKD; if(toCurr === 'THB') return hkdVal / appState.rates.THB_HKD; if(toCurr === 'VND') return hkdVal / appState.rates.VND_HKD; return 0;
+    }
+
+    function renderList() {
+        const container = document.getElementById('listContainer'); container.innerHTML = ''; const displayTotalCurr = document.getElementById('totalCurrencySelect').value;
+        let filtered = appState.expenses.filter(e => (e.bookId === appState.currentBookId || (!e.bookId && appState.currentBookId === 'default')) && e.mode === appState.mode);
+        if (appState.view.filterTag !== 'All') filtered = filtered.filter(e => e.tag === appState.view.filterTag);
+        if (appState.view.filterTitle !== 'All') { filtered = filtered.filter(e => { const key = `${appState.currentBookId}_${e.date}`; return appState.dayTitles[key] === appState.view.filterTitle; }); } else if (!appState.view.showAllDates) { filtered = filtered.filter(e => e.date === appState.view.filterDate); }
+        filtered.sort((a,b) => { if (a.date !== b.date) return new Date(b.date) - new Date(a.date); return b.id - a.id; });
+        let totalForBar = 0;
+
+        if (appState.view.mode === 'card' && (appState.view.showAllDates || appState.view.filterTitle !== 'All')) {
+            const aggregated = {}; filtered.forEach(item => { if (!aggregated[item.title]) { aggregated[item.title] = { title: item.title, count: 0, tag: item.tag, sampleItem: item }; } aggregated[item.title].count++; const totalAmt = item.amount + (item.supplement||0); totalForBar += getConvertedValue(totalAmt, item.currency, displayTotalCurr); });
+            const grid = document.createElement('div'); grid.className = 'card-grid';
+            Object.values(aggregated).forEach(group => { const div = document.createElement('div'); div.className = 'expense-card-item'; const links = getExternalLinks(group.title); div.innerHTML = `<div class="card-header"><span class="card-tag">${group.tag}</span></div><div class="card-main"><div style="font-weight:bold; font-size:16px;">${group.title} ${links}</div><div style="font-size:24px; margin-top:10px;">${getMoodEmoji(group.sampleItem.mood)}</div></div><div class="card-footer" style="justify-content:center; border-top:1px solid #eee; padding-top:10px;"><div class="count-display">x ${group.count}</div><div class="count-label" style="margin-left:5px;">次</div></div>`; grid.appendChild(div); }); container.appendChild(grid);
+        } else if (appState.view.mode === 'card') {
+            const grid = document.createElement('div'); grid.className = 'card-grid'; filtered.forEach(item => { const card = createCardItem(item, displayTotalCurr); grid.appendChild(card.el); totalForBar += card.val; }); container.appendChild(grid);
+        } else {
+            const dates = [...new Set(filtered.map(e => e.date))]; dates.forEach(d => {
+                const key = `${appState.currentBookId}_${d}`; let dayTitle = appState.dayTitles[key] || ''; if (!dayTitle && appState.mode === 'daily') dayTitle = '深圳'; if(dayTitle) dayTitle = ` - ${dayTitle}`;
+                if(appState.view.showAllDates || appState.view.filterTitle !== 'All') { container.innerHTML += `<div style="text-align:center; margin:15px 0 5px 0; color:#888; font-weight:bold; font-size:14px;">${d}${dayTitle}</div>`; }
+                ['morning','noon','night'].forEach(p => { const items = filtered.filter(e => e.date === d && e.period === p); if(items.length === 0) return; const grp = document.createElement('div'); grp.className = 'list-group'; const periodTitle = p === 'morning' ? '早上 ☀️' : (p==='noon' ? '中午 🌤️' : '晚上 🌙'); grp.innerHTML = `<div class="section-title">${periodTitle}</div>`; items.forEach(item => { const row = createListItem(item, displayTotalCurr); grp.appendChild(row.el); totalForBar += row.val; }); container.appendChild(grp); });
+            });
+        }
+        let tSymbol = displayTotalCurr; if(displayTotalCurr === 'RMB') tSymbol = '¥'; else if(displayTotalCurr === 'JPY') tSymbol = 'JP¥'; else if(displayTotalCurr === 'THB') tSymbol = '฿'; else if(displayTotalCurr === 'VND') tSymbol = '₫'; else tSymbol = '$';
+        document.getElementById('grandTotal').innerText = `${tSymbol} ${totalForBar.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})}`;
+    }
+
+    function createListItem(item, displayCurr) {
+        const totalAmt = item.amount + (item.supplement||0); const val = getConvertedValue(totalAmt, item.currency, displayCurr);
+        let symbol = item.currency, colorCls = ''; if(item.currency === 'RMB') { symbol = '¥'; colorCls = 'price-cny'; } else if(item.currency === 'JPY') { symbol = 'JP¥'; colorCls = 'price-jpy'; } else if(item.currency === 'THB') { symbol = '฿'; colorCls = 'price-thb'; } else if(item.currency === 'VND') { symbol = '₫'; colorCls = 'price-vnd'; } else { symbol = '$'; colorCls = 'price-hkd'; }
+        let subText = item.currency !== 'HKD' ? `≈ HK$${getConvertedValue(totalAmt, item.currency, 'HKD').toFixed(1)}` : ''; let supHTML = (item.supplement>0) ? `<span class="sup-badge">+${item.supplement}補</span>` : ''; 
+        let memberStr = (item.involved && item.involved.length>0 && (item.involved.length !== appState.members.length || appState.members.length===1)) ? `<div class="member-badge">${item.involved.join(',')}</div>` : '';
+        const links = getExternalLinks(item.title); const div = document.createElement('div'); div.className = 'expense-item'; div.innerHTML = `<div class="item-info" onclick="openEdit(${item.id})"><div class="item-title-row"><span class="item-title">${item.title}</span><span class="item-mood">${getMoodEmoji(item.mood)}</span>${links}${supHTML}</div><div class="item-meta"><span class="tag-badge">${item.tag}</span>${memberStr}<button class="currency-switch-btn" onclick="cycleCurrencyTag(${item.id}, event)">${item.currency}</button></div></div><div class="item-right-group"><div class="item-price-box" onclick="openEdit(${item.id})"><div class="main-price ${colorCls}">${symbol}${totalAmt.toLocaleString()}</div><div class="sub-price">${subText}</div></div><button class="btn-delete-mini" onclick="deleteDirect(${item.id}, event)">✕</button></div>`; return { el: div, val: val };
+    }
+    function createCardItem(item, displayCurr) {
+        const totalAmt = item.amount + (item.supplement||0); const val = getConvertedValue(totalAmt, item.currency, displayCurr);
+        let symbol = item.currency, colorCls = ''; if(item.currency === 'RMB') { symbol = '¥'; colorCls = 'price-cny'; } else if(item.currency === 'JPY') { symbol = 'JP¥'; colorCls = 'price-jpy'; } else if(item.currency === 'THB') { symbol = '฿'; colorCls = 'price-thb'; } else if(item.currency === 'VND') { symbol = '₫'; colorCls = 'price-vnd'; } else { symbol = '$'; colorCls = 'price-hkd'; }
+        let pIcon = item.period==='morning'?'☀️':(item.period==='noon'?'🌤️':'🌙'); const links = getExternalLinks(item.title); const div = document.createElement('div'); div.className = 'expense-card-item'; div.onclick = () => openEdit(item.id); div.innerHTML = `<div class="card-period-icon">${pIcon}</div><div class="card-header"><div><span class="card-tag">${item.tag}</span><div class="card-date">${item.date.slice(5)}</div></div></div><div class="card-main"><div style="font-weight:bold; font-size:16px;">${item.title}${links}</div><div style="font-size:20px; margin-top:5px;">${getMoodEmoji(item.mood)}</div></div><div class="card-footer"><div class="${colorCls}" style="font-weight:bold; font-size:18px;">${symbol}${totalAmt}</div><button class="currency-switch-btn" onclick="cycleCurrencyTag(${item.id}, event)">${item.currency}</button></div>`; return { el: div, val: val };
+    }
+
+    function openEdit(id) { appState.editingId = id; const item = appState.expenses.find(e => e.id === id); document.getElementById('editDate').value = item.date || todayStr; document.getElementById('editTitle').value = item.title; document.getElementById('editAmount').value = item.amount; document.getElementById('editSupplement').value = item.supplement || 0; const supGroup = document.getElementById('editSupGroup'); if(item.tag === '交通' || (item.supplement && item.supplement > 0)) supGroup.style.display = 'block'; else supGroup.style.display = 'none'; setEditMood(item.mood || 'normal'); renderMemberSelector('edit', item.involved || [...appState.members]); document.getElementById('editModal').classList.add('show'); }
+    function closeEdit(e) { if(e.target.id === 'editModal') document.getElementById('editModal').classList.remove('show'); }
+    function saveEdit() { const d = document.getElementById('editDate').value; const t = document.getElementById('editTitle').value; const a = parseFloat(document.getElementById('editAmount').value); const s = parseFloat(document.getElementById('editSupplement').value) || 0; const chips = document.getElementById('editMemberSelector').querySelectorAll('.member-select-chip.active'); const selected = Array.from(chips).map(c => c.innerText); const item = appState.expenses.find(e => e.id === appState.editingId); if(item) { item.date = d; item.title=t; item.amount=a; item.supplement = s; item.mood = appState.editMoodTemp; item.involved = selected; localStorage.setItem('expenses_v17', JSON.stringify(appState.expenses)); renderList(); updateTitleSuggestions(); } document.getElementById('editModal').classList.remove('show'); }
+    function deleteDirect(id, event) { event.stopPropagation(); appState.expenses = appState.expenses.filter(e => e.id !== id); localStorage.setItem('expenses_v17', JSON.stringify(appState.expenses)); renderList(); }
+    function cycleCurrencyTag(id, event) { event.stopPropagation(); const item = appState.expenses.find(e => e.id === id); if (appState.mode === 'daily') { item.currency = (item.currency === 'HKD') ? 'RMB' : 'HKD'; } else { if(item.currency === 'JPY') item.currency = 'THB'; else if(item.currency === 'THB') item.currency = 'VND'; else if(item.currency === 'VND') item.currency = 'HKD'; else item.currency = 'JPY'; } localStorage.setItem('expenses_v17', JSON.stringify(appState.expenses)); renderList(); }
+
+    function showExport() {
+        const modal = document.getElementById('exportModal'); const content = document.getElementById('receiptContent'); const displayCurr = document.getElementById('totalCurrencySelect').value;
+        let filtered = appState.expenses.filter(e => e.mode === appState.mode && (e.bookId === appState.currentBookId || (!e.bookId && appState.currentBookId === 'default')));
+        if (appState.view.filterTitle !== 'All') { filtered = filtered.filter(e => { const key = `${appState.currentBookId}_${e.date}`; return appState.dayTitles[key] === appState.view.filterTitle; }); } else if (!appState.view.showAllDates) { filtered = filtered.filter(e => e.date === appState.view.filterDate); }
+        if (appState.view.filterTag !== 'All') filtered = filtered.filter(e => e.tag === appState.view.filterTag);
+
+        let memberDebts = {}; appState.members.forEach(m => memberDebts[m] = 0); let grandTotal = 0; let tSymbol = displayCurr; if(displayCurr === 'RMB') tSymbol = '¥'; else if(displayCurr === 'JPY') tSymbol = 'JP¥'; else if(displayCurr === 'THB') tSymbol = '฿'; else if(displayCurr === 'VND') tSymbol = '₫'; else tSymbol = '$';
+        const currentBook = appState.books.find(b=>b.id===appState.currentBookId); let titleStr = appState.view.filterTitle !== 'All' ? `${appState.view.filterTitle} (統計)` : (appState.view.showAllDates ? '所有日期' : appState.view.filterDate);
+
+        let html = `<div style="text-align:center;margin-bottom:15px;border-bottom:2px dashed #ccc;padding-bottom:10px;"><div style="font-size:18px;font-weight:bold;">🧾 結算單</div><div style="font-size:14px;font-weight:bold;">${currentBook.name}</div><div style="font-size:12px;color:#666;">${titleStr}</div></div>`;
+        const periods = ['morning','noon','night']; const pNames = {morning:'早上', noon:'中午', night:'晚上'};
+        periods.forEach(p => {
+            const items = filtered.filter(e => e.period === p);
+            if(items.length > 0) {
+                html += `<div style="font-weight:bold; margin-top:10px; margin-bottom:5px; border-bottom:1px solid #eee;">${pNames[p]}</div>`;
+                items.forEach((item, index) => {
+                    const totalAmt = item.amount + (item.supplement||0); const converted = getConvertedValue(totalAmt, item.currency, displayCurr); grandTotal += converted;
+                    const involved = item.involved || appState.members; const perPerson = converted / involved.length;
+                    involved.forEach(m => { if(memberDebts[m]!==undefined) memberDebts[m] += perPerson; else memberDebts[m]=perPerson; });
+                    
+                    // Req 3: Generate detailed member badges
+                    let memberBadgesHtml = '';
+                    appState.members.forEach(m => {
+                        const isInvolved = involved.includes(m);
+                        memberBadgesHtml += `<span class="receipt-member-tag ${isInvolved ? 'involved' : ''}">${m}</span>`;
+                    });
+
+                    html += `
+                        <div style="margin-bottom:8px;">
+                            <div style="display:flex;justify-content:space-between;font-size:13px;"><span>${item.title}</span><span>${tSymbol}${converted.toFixed(1)}</span></div>
+                            <div class="receipt-members">${memberBadgesHtml}</div>
+                        </div>
+                    `;
+                });
+            }
+        });
+        html += `<div style="border-top:2px dashed #ccc;margin:10px 0;padding-top:10px;font-weight:bold;font-size:16px;display:flex;justify-content:space-between;"><span>Total</span><span>${tSymbol}${grandTotal.toLocaleString()}</span></div>`;
+        html += `<table style="width:100%;margin-top:15px;border-collapse:collapse;"><tr><th style="text-align:left;border-bottom:1px solid #ccc;">成員應付</th><th style="text-align:right;border-bottom:1px solid #ccc;">金額</th></tr>`;
+        for(let m in memberDebts) { if(appState.members.includes(m) || memberDebts[m]>0) html += `<tr><td>${m}</td><td style="text-align:right;">${tSymbol}${memberDebts[m].toFixed(1)}</td></tr>`; }
+        html += `</table>`;
+        content.innerHTML = html; modal.classList.add('show');
+    }
+    function closeExport(e) { if(e.target.id === 'exportModal' || e.target.tagName === 'BUTTON') document.getElementById('exportModal').classList.remove('show'); }
+
+    init();
+</script>
+</body>
+</html>
